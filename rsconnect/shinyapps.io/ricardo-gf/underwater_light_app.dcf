@@ -1,0 +1,13 @@
+name: underwater_light_app
+title: underwater_light_app
+username: ricardo-gf
+account: ricardo-gf
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12316035
+bundleId: 8862026
+url: https://ricardo-gf.shinyapps.io/underwater_light_app/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: 2017_18_ntu_vs_par.RData|CITATION.cff|README.md

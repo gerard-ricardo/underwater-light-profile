@@ -13,48 +13,122 @@ library(png)
 library(ggplot2)
 library(shinythemes)
 library(shinycssloaders)
+library(bslib)
+
+data1_comb <- read.table("data1_comb.txt", sep = "\t", header = TRUE)
+
+
+options(scipen = 999)  # turn off scientific notation
+#str(data1_comb)
+data1_comb$deploy <- as.factor(as.character(data1_comb$deploy))
 
 
 
-# Define UI for application 
-ui <- fluidPage(
-  theme = shinytheme("cerulean"),
+# Define UI for application
+ui <- page_fillable(
+  theme = bs_theme(version = 5, bootswatch = "cerulean"),
+  tags$style(HTML("
+    .card {
+      height: 250px;  /* Adjust the height as needed */
+    }
+  ")),
   titlePanel("Underwater spectral profile"),
-  fluidRow("Underwater spectral profile for a reef site at ~5 m depth off Magnetic Island, Cleaveland Bay, Townsville. Note: NTU can be converted to suspended sediment concentrations by using an approximate conversion factor of 1.1"),
-  sidebarLayout(
-    sidebarPanel(
+  fluidRow(
+    column(4, card(
+      title = "Select Deployment Year",
+      selectInput("deploy_select", 
+                  "Select Deployment Year:",
+                  choices = unique(data1_comb$deploy))
+    )),
+    column(4, card(
+      title = "NTU Percentiles (prob)",
       sliderInput("ntu_perc",
                   "NTU percentiles (prob)",
                   min = 0,
                   max = 1,
                   value = 0.5)
-    ),
-    sidebarPanel(
+    )),
+    column(4, card(
+      title = "Decimal Time",
       sliderInput("time",
                   "Decimal time (0.5 * 24hr = midday)",
                   min = 0.2,
                   max = 0.8,
                   value = 0.5, step = 0.1)
-    )
-  ),
-  mainPanel(
-    withSpinner(plotOutput("distPlot", width = "1000px", height = "700px")),
-    "Please cite: Ricardo et al 2022 - XXX"
+    ))
   ),
   fluidRow(
-    tableOutput("results")  # nm and irradiance
+    column(8,
+           withSpinner(plotOutput("distPlot"))
+    ),
+    column(4,
+           tableOutput("results")
+    )
+  ),
+  fluidRow(
+    column(12,
+           "Please cite: Ricardo, G. (2024). Underwater spectral profiles in Cleveland Bay (Version 1.0.0) [Computer software]. https://github.com/gerard-ricardo/underwater-light-profile"
+    )
   )
 )
 
+
+# # Define UI for application 
+# ui <- fluidPage(
+#   theme = shinytheme("cerulean"),
+#   titlePanel("Underwater spectral profile"),
+#   fluidRow("Underwater spectral profile for a reef site off Magnetic Island, Cleaveland Bay, Townsville. 
+#   The 2017 deployment was in muddy seabed just off the reef at ~11m depth, whereas the 2018 deployment was at ~5 m on the reef.
+#            Note: NTU can be converted to suspended sediment concentrations by using an approximate conversion factor of 1.1"),
+#   sidebarLayout(
+#     sidebarPanel(
+#       selectInput("deploy_select", 
+#                   "Select Deployment Year:",
+#                   choices = unique(data1_comb$deploy)), 
+#       sliderInput("ntu_perc",
+#                   "NTU percentiles (prob)",
+#                   min = 0,
+#                   max = 1,
+#                   value = 0.5)
+#     ),
+#     sidebarPanel(
+#       sliderInput("time",
+#                   "Decimal time (0.5 * 24hr = midday)",
+#                   min = 0.2,
+#                   max = 0.8,
+#                   value = 0.5, step = 0.1)
+#     )
+#   ),
+#   mainPanel(
+#     withSpinner(plotOutput("distPlot", width = "1000px", height = "700px")),
+#     "Please cite: Ricardo, G. (2024). Underwater spectral profiles in Cleveland Bay (Version 1.0.0) [Computer software]. https://github.com/gerard-ricardo/underwater-light-profile"
+#   ),
+#   fluidRow(
+#     tableOutput("results")  # nm and irradiance
+#   )
+# )
+
 # Define server logic required to draw a histogram
-server <- function(input, output) {
-  data1_comb <- read.table(file="https://raw.githubusercontent.com/gerard-ricardo/data/master/2018%20ntu%20and%20par", header=TRUE, dec=",", na.strings=c("",".","NA"))
-  options(scipen = 999)  # turn off scientific notation
-  data1_comb[] <- lapply(data1_comb, function(x) as.numeric(as.character(x)))  # convert all to numeric
+server <- function(input, output, session) {
+  # Load data first
+  #load("./2017_18_ntu_vs_par.RData")  # data1_comb
+  #write.table(data1_comb, file = "data1_comb.txt", sep = "\t", row.names = F)
+
+  
+  # Get the current column names of the dataframe
+  col_names <- names(data1_comb)
+  
+  # Identify numeric columns and prepend 'x' to their names
+  names(data1_comb) <- ifelse(grepl("^[0-9]+$", col_names), paste0("x", col_names), col_names)
+  
+  # Update the select input with deployment years after data is loaded
+  updateSelectInput(session, "deploy_select", choices = unique(data1_comb$deploy))
   
   output$distPlot <- renderPlot({
-    req(input$ntu_perc, input$time)  # Ensure inputs are available
-  
+    req(input$ntu_perc, input$time, input$deploy_select)  # Ensure inputs are available
+    
+    data1_comb <- data1_comb[data1_comb$deploy == input$deploy_select, ]
+    
     data1_comb$ntu <- round(data1_comb$ntu, 1)  # round to 1 dec for broader categories
     x_percentile <- input$ntu_perc  # in probs
     result_perc <- round(unname(quantile(data1_comb$ntu, probs = x_percentile)), 1)  # insert probs, return ntu
@@ -64,7 +138,7 @@ server <- function(input, output) {
     time_cat <- input$time  # values 
     subset_dc1 <- subset_dc[subset_dc$time == time_cat, ]  # numeric
     
-    data_long <- subset_dc1 %>% pivot_longer(-c(date.time, ntu, SS, time, tot.par.a), names_to = "bin", values_to = "meas")
+    data_long <- subset_dc1 %>% pivot_longer(-c(date.time, ntu, SS, time, tot_par_a, deploy), names_to = "bin", values_to = "meas")
     nm <- c(425, 455, 485, 515, 555, 615, 660, 695)
     data_long$nm <- rep(nm, nrow(data_long) / length(nm))
     med_d3 <- data_long %>% group_by(bin) %>% summarise(med = median(meas))
@@ -88,26 +162,29 @@ server <- function(input, output) {
   })
   
   output$results <- renderTable({
-    req(input$ntu_perc, input$time)  # Ensure inputs are available
+    req(input$ntu_perc, input$time, input$deploy_select)  # Ensure inputs are available
     
-    data1_comb$ntu <- round(data1_comb$ntu, 1)  # round to 1 dec for broader categories
+    selected_data <- data1_comb[data1_comb$deploy == input$deploy_select, ]
+    
+    selected_data$ntu <- round(selected_data$ntu, 1)  # round to 1 dec for broader categories
     x_percentile <- input$ntu_perc  # in probs
-    result_perc <- round(unname(quantile(data1_comb$ntu, probs = x_percentile)), 1)  # insert probs, return ntu
-    subset_dc <- data1_comb[data1_comb$ntu == result_perc, ]  # numeric
+    result_perc <- round(unname(quantile(selected_data$ntu, probs = x_percentile)), 1)  # insert probs, return ntu
+    subset_dc <- selected_data[selected_data$ntu == result_perc, ]  # numeric
     
     subset_dc$time <- round(subset_dc$time, 1)  # round to 1 dec for broader categories
     time_cat <- input$time  # values 
     subset_dc1 <- subset_dc[subset_dc$time == time_cat, ]  # numeric
     
-    data_long <- subset_dc1 %>% pivot_longer(-c(date.time, ntu, SS, time, tot.par.a), names_to = "bin", values_to = "meas")
+    data_long <- subset_dc1 %>% pivot_longer(-c(date.time, ntu, SS, time, tot_par_a, deploy), names_to = "bin", values_to = "meas")
     nm <- c(425, 455, 485, 515, 555, 615, 660, 695)
     data_long$nm <- rep(nm, nrow(data_long) / length(nm))
     
-    df <- data.frame(median(data_long$tot.par.a))
+    df <- data.frame(median(data_long$tot_par_a))
     names(df) <- 'Total PAR'
     df
   })
 }
+
 
 # Run the application 
 shinyApp(ui = ui, server = server)
