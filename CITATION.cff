@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Your Last Name"
+    given-names: "Your First Name"
+    orcid: "https://orcid.org/your-orcid-id"
+title: "Your Project Title"
+version: "1.0.0"
+doi: "10.5281/zenodo.1234567"
+date-released: 2024-07-14
+url: "https://github.com/yourusername/your-repo"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.1234567"
+repository-code: "https://github.com/yourusername/your-repo"
+license: "Apache-2.0"
